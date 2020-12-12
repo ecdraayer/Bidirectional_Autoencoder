@@ -191,6 +191,7 @@ def Model(_abnormal_data, _abnormal_label, _hidden_num, _elem_num):
 
         # with tf.device('/device:GPU:0'):
         with tf.variable_scope('encoder'):
+
             (enc_output, enc_state) = tf.nn.dynamic_rnn(enc_cell, p_input, dtype=tf.float32)
 
         # with tf.device('/device:GPU:1'):
@@ -294,10 +295,10 @@ def RunModel(_abnormal_data, _abnormal_label, _hidden_num, _elem_num):
 
 if __name__ == '__main__':
     batch_num = 1
-    hidden_num = 16
+    hidden_num = 8
     # step_num = 8
     iteration = 50
-    ensemble_space = 20
+    ensemble_space = 40
     learning_rate = 1e-3
     multivariate = True
 
@@ -313,450 +314,11 @@ if __name__ == '__main__':
         sys.argv[1]
     except IndexError:
         # Only use NAB dataset
-        for n in range(4, 4):
-            # file name parameter
-            dataset = n
-            if dataset == 1:
-                file_name = './GD/data/Genesis_AnomalyLabels.csv'
-                print(file_name)
-                k_partition = 40
-                abnormal_data, abnormal_label = ReadGDDataset(file_name)
-                elem_num = 18
-                if multivariate:
-                    abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                if partition:
-                    splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data, abnormal_label, _part_number=k_partition)
-                    final_error = []
-                    for i in range(k_partition):
-                        error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                        final_error.append(error_partition)
-                    # print('-----------------------------------------')
-                    final_error = np.concatenate(final_error).ravel()
-                    final_zscore = Z_Score(final_error)
-                    y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                    precision, recall, f1 = CalculatePrecisionRecallF1Metrics(abnormal_label, y_pred)
-                    PrintPrecisionRecallF1Metrics(precision, recall, f1)
-                    _, _, roc_auc = CalculateROCAUCMetrics(abnormal_label, final_error)
-                    print('roc_auc=' + str(roc_auc))
-                    _, _, pr_auc = CalculatePrecisionRecallCurve(abnormal_label, final_error)
-                    print('pr_auc=' + str(pr_auc))
-                    cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                    print('cohen_kappa=' + str(cks))
-                else:
-                    error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label, hidden_num, elem_num)
-            
-            if dataset == 2:
-                file_name = './HSS/data/HRSS_anomalous_standard.csv'
-                print(file_name)
-                k_partition = 80
-                abnormal_data, abnormal_label = ReadHSSDataset(file_name)
-                elem_num = 18
-                if multivariate:
-                    abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                if partition:
-                    splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data, abnormal_label, _part_number=k_partition)
-                    final_error = []
-                    for i in range(k_partition):
-                        error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                        final_error.append(error_partition)
-                    # print('-----------------------------------------')
-                    final_error = np.concatenate(final_error).ravel()
-                    final_zscore = Z_Score(final_error)
-                    y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                    precision, recall, f1 = CalculatePrecisionRecallF1Metrics(abnormal_label, y_pred)
-                    PrintPrecisionRecallF1Metrics(precision, recall, f1)
-                    _, _, roc_auc = CalculateROCAUCMetrics(abnormal_label, final_error)
-                    print('roc_auc=' + str(roc_auc))
-                    _, _, pr_auc = CalculatePrecisionRecallCurve(abnormal_label, final_error)
-                    print('pr_auc=' + str(pr_auc))
-                    cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                    print('cohen_kappa=' + str(cks))
-                else:
-                    error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label, hidden_num, elem_num)
-
-            if dataset == 3:
-                for root, dirs, _ in os.walk('./YAHOO/data'):
-                    for dir in dirs:
-                        k_partition = 10
-                        s_precision = []
-                        s_recall = []
-                        s_f1 = []
-                        s_roc_auc = []
-                        s_pr_auc = []
-                        s_cks = []
-                        for _, _, files in os.walk(root + '/' + dir):
-                            for file in files:
-                                file_name = os.path.join(root, dir, file)
-                                print(file_name)
-                                abnormal_data, abnormal_label = ReadS5Dataset(file_name)
-                                elem_num = 1
-                                if multivariate:
-                                    abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                                if partition:
-                                    splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data, abnormal_label, _part_number=k_partition)
-                                    final_error = []
-                                    for i in range(k_partition):
-                                        error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                                        final_error.append(error_partition)
-                                    # print('-----------------------------------------')
-                                    final_error = np.concatenate(final_error).ravel()
-                                    final_zscore = Z_Score(final_error)
-                                    y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                                    precision, recall, f1 = CalculatePrecisionRecallF1Metrics(abnormal_label, y_pred)
-                                    PrintPrecisionRecallF1Metrics(precision, recall, f1)
-                                    _, _, roc_auc = CalculateROCAUCMetrics(abnormal_label, final_error)
-                                    print('roc_auc=' + str(roc_auc))
-                                    _, _, pr_auc = CalculatePrecisionRecallCurve(abnormal_label, final_error)
-                                    print('pr_auc=' + str(pr_auc))
-                                    cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                                    print('cohen_kappa=' + str(cks))
-                                else:
-                                    error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label, hidden_num, elem_num)
-
-                                s_precision.append(precision)
-                                s_recall.append(recall)
-                                s_f1.append(f1)
-                                s_roc_auc.append(roc_auc)
-                                s_pr_auc.append(pr_auc)
-                                s_cks.append(cks)
-                        print('########################################')
-                        avg_precision = CalculateAverageMetric(s_precision)
-                        print('avg_precision=' + str(avg_precision))
-                        avg_recall = CalculateAverageMetric(s_recall)
-                        print('avg_recall=' + str(avg_recall))
-                        avg_f1 = CalculateAverageMetric(s_f1)
-                        print('avg_f1=' + str(avg_f1))
-                        avg_roc_auc = CalculateAverageMetric(s_roc_auc)
-                        print('avg_roc_auc=' + str(avg_roc_auc))
-                        avg_pr_auc = CalculateAverageMetric(s_pr_auc)
-                        print('avg_pr_auc=' + str(avg_pr_auc))
-                        avg_cks = CalculateAverageMetric(s_cks)
-                        print('avg_cks=' + str(avg_cks))
-                        print('########################################')
-
-            if dataset == 4:
-                for root, dirs, _ in os.walk('./NAB/data'):
-                    for dir in dirs:
-                        k_partition = 10
-                        s_precision = []
-                        s_recall = []
-                        s_f1 = []
-                        s_roc_auc = []
-                        s_pr_auc = []
-                        s_cks = []
-                        for _, _, files in os.walk(root + '/' + dir):
-                            for file in files:
-                                file_name = os.path.join(root, dir, file)
-                                print(file_name)
-                                abnormal_data, abnormal_label = ReadNABDataset(file_name)
-                                elem_num = 1
-                                if multivariate:
-                                    abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                                if partition:
-                                    splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data, abnormal_label,
-                                                                                             _part_number=k_partition)
-                                    final_error = []
-                                    for i in range(k_partition):
-                                        error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                                        final_error.append(error_partition)
-                                    # print('-----------------------------------------')
-                                    final_error = np.concatenate(final_error).ravel()
-                                    final_zscore = Z_Score(final_error)
-                                    y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                                    precision, recall, f1 = CalculatePrecisionRecallF1Metrics(abnormal_label, y_pred)
-                                    PrintPrecisionRecallF1Metrics(precision, recall, f1)
-                                    _, _, roc_auc = CalculateROCAUCMetrics(abnormal_label, final_error)
-                                    print('roc_auc=' + str(roc_auc))
-                                    _, _, pr_auc = CalculatePrecisionRecallCurve(abnormal_label, final_error)
-                                    print('pr_auc=' + str(pr_auc))
-                                    cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                                    print('cohen_kappa=' + str(cks))
-                                else:
-                                    error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label, hidden_num, elem_num)
-
-                                s_precision.append(precision)
-                                s_recall.append(recall)
-                                s_f1.append(f1)
-                                s_roc_auc.append(roc_auc)
-                                s_pr_auc.append(pr_auc)
-                                s_cks.append(cks)
-                        print('########################################')
-                        avg_precision = CalculateAverageMetric(s_precision)
-                        print('avg_precision=' + str(avg_precision))
-                        avg_recall = CalculateAverageMetric(s_recall)
-                        print('avg_recall=' + str(avg_recall))
-                        avg_f1 = CalculateAverageMetric(s_f1)
-                        print('avg_f1=' + str(avg_f1))
-                        avg_roc_auc = CalculateAverageMetric(s_roc_auc)
-                        print('avg_roc_auc=' + str(avg_roc_auc))
-                        avg_pr_auc = CalculateAverageMetric(s_pr_auc)
-                        print('avg_pr_auc=' + str(avg_pr_auc))
-                        avg_cks = CalculateAverageMetric(s_cks)
-                        print('avg_cks=' + str(avg_cks))
-                        print('########################################')
-
-            if dataset == 5:
-                for root, dirs, files in os.walk('./2D/test'):
-                    for dir in dirs:
-                        k_partition = 3
-                        s_precision = []
-                        s_recall = []
-                        s_f1 = []
-                        s_roc_auc = []
-                        s_pr_auc = []
-                        s_cks = []
-                        for _, _, files in os.walk(root + '/' + dir):
-                            for file in files:
-                                file_name = os.path.join(root, dir, file)
-                                print(file_name)
-                                abnormal_data, abnormal_label = Read2DDataset(file_name)
-                                elem_num = 2
-                                if multivariate:
-                                    abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                                if partition:
-                                    splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data,
-                                                                                             abnormal_label,
-                                                                                             _part_number=k_partition)
-                                    final_error = []
-                                    for i in range(k_partition):
-                                        error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, pr_cks = RunModel(
-                                            splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                                        final_error.append(error_partition)
-                                    # print('-----------------------------------------')
-                                    final_error = np.concatenate(final_error).ravel()
-                                    final_zscore = Z_Score(final_error)
-                                    y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                                    final_p, final_r, final_f = CalculatePrecisionRecallF1Metrics(abnormal_label,
-                                                                                                  y_pred)
-                                    PrintPrecisionRecallF1Metrics(final_p, final_r, final_f)
-                                    final_fpr, final_tpr, final_average_roc_auc = CalculateROCAUCMetrics(abnormal_label,
-                                                                                                         final_error)
-                                    print('roc_auc=' + str(final_average_roc_auc))
-                                    final_precision_curve, final_recall_curve, final_average_precision = CalculatePrecisionRecallCurve(
-                                        abnormal_label, final_error)
-                                    print('pr_auc=' + str(final_average_precision))
-                                    cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                                    print('cohen_kappa=' + str(cks))
-                                else:
-                                    error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data,
-                                                                                                  abnormal_label, hidden_num, elem_num)
-
-                                s_precision.append(final_p)
-                                s_recall.append(final_r)
-                                s_f1.append(final_f)
-                                s_roc_auc.append(final_average_roc_auc)
-                                s_pr_auc.append(final_average_precision)
-                                s_cks.append(cks)
-                        print('########################################')
-                        avg_precision = CalculateAverageMetric(s_precision)
-                        print('avg_precision=' + str(avg_precision))
-                        avg_recall = CalculateAverageMetric(s_recall)
-                        print('avg_recall=' + str(avg_recall))
-                        avg_f1 = CalculateAverageMetric(s_f1)
-                        print('avg_f1=' + str(avg_f1))
-                        avg_roc_auc = CalculateAverageMetric(s_roc_auc)
-                        print('avg_roc_auc=' + str(avg_roc_auc))
-                        avg_pr_auc = CalculateAverageMetric(s_pr_auc)
-                        print('avg_pr_auc=' + str(avg_pr_auc))
-                        avg_cks = CalculateAverageMetric(s_cks)
-                        print('avg_cks=' + str(avg_cks))
-                        print('########################################')
-
-            if dataset == 6:
-                k_partition = 2
-                s_precision = []
-                s_recall = []
-                s_f1 = []
-                s_roc_auc = []
-                s_pr_auc = []
-                s_cks = []
-                for root, dirs, _ in os.walk('./UAH/'):
-                    for dir in dirs:
-                        folder_name = os.path.join(root, dir)
-                        print(folder_name)
-                        abnormal_data, abnormal_label = ReadUAHDataset(folder_name)
-                        elem_num = 4
-                        if multivariate:
-                            abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                        if partition:
-                            splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data, abnormal_label,
-                                                                                     _part_number=k_partition)
-                            final_error = []
-                            for i in range(k_partition):
-                                error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(
-                                    splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                                final_error.append(error_partition)
-                            # print('-----------------------------------------')
-                            final_error = np.concatenate(final_error).ravel()
-                            final_zscore = Z_Score(final_error)
-                            y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                            print('########################################')
-                            precision, recall, f1 = CalculatePrecisionRecallF1Metrics(abnormal_label, y_pred)
-                            PrintPrecisionRecallF1Metrics(precision, recall, f1)
-                            _, _, roc_auc = CalculateROCAUCMetrics(abnormal_label, final_error)
-                            print('roc_auc=' + str(roc_auc))
-                            _, _, pr_auc = CalculatePrecisionRecallCurve(abnormal_label, final_error)
-                            print('pr_auc=' + str(pr_auc))
-                            cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                            print('cohen_kappa=' + str(cks))
-                            print('########################################')
-                        else:
-                            error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label,
-                                                                                          hidden_num, elem_num)
-
-                        s_precision.append(precision)
-                        s_recall.append(recall)
-                        s_f1.append(f1)
-                        s_roc_auc.append(roc_auc)
-                        s_pr_auc.append(pr_auc)
-                        s_cks.append(cks)
-                print('########################################')
-                avg_precision = CalculateAverageMetric(s_precision)
-                print('avg_precision=' + str(avg_precision))
-                avg_recall = CalculateAverageMetric(s_recall)
-                print('avg_recall=' + str(avg_recall))
-                avg_f1 = CalculateAverageMetric(s_f1)
-                print('avg_f1=' + str(avg_f1))
-                avg_roc_auc = CalculateAverageMetric(s_roc_auc)
-                print('avg_roc_auc=' + str(avg_roc_auc))
-                avg_pr_auc = CalculateAverageMetric(s_pr_auc)
-                print('avg_pr_auc=' + str(avg_pr_auc))
-                avg_cks = CalculateAverageMetric(s_cks)
-                print('avg_cks=' + str(avg_cks))
-                print('########################################')
-
-            if dataset == 7:
-                for root, dirs, files in os.walk('./ECG/'):
-                    for dir in dirs:
-                        k_partition = 10
-                        s_precision = []
-                        s_recall = []
-                        s_f1 = []
-                        s_roc_auc = []
-                        s_pr_auc = []
-                        s_cks = []
-                        for _, _, files in os.walk(root + '/' + dir):
-                            for file in files:
-                                file_name = os.path.join(root, dir, file)
-                                print(file_name)
-                                abnormal_data, abnormal_label = ReadECGDataset(file_name)
-                                elem_num = 3
-                                if multivariate:
-                                    abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                                if partition:
-                                    splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data,
-                                                                                             abnormal_label,
-                                                                                             _part_number=k_partition)
-                                    final_error = []
-                                    for i in range(k_partition):
-                                        error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, pr_cks = RunModel(
-                                            splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                                        final_error.append(error_partition)
-                                    # print('-----------------------------------------')
-                                    final_error = np.concatenate(final_error).ravel()
-                                    final_zscore = Z_Score(final_error)
-                                    y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                                    final_p, final_r, final_f = CalculatePrecisionRecallF1Metrics(abnormal_label,
-                                                                                                  y_pred)
-                                    PrintPrecisionRecallF1Metrics(final_p, final_r, final_f)
-                                    final_fpr, final_tpr, final_average_roc_auc = CalculateROCAUCMetrics(abnormal_label,
-                                                                                                         final_error)
-                                    print('roc_auc=' + str(final_average_roc_auc))
-                                    final_precision_curve, final_recall_curve, final_average_precision = CalculatePrecisionRecallCurve(
-                                        abnormal_label, final_error)
-                                    print('pr_auc=' + str(final_average_precision))
-                                    cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                                    print('cohen_kappa=' + str(cks))
-                                else:
-                                    error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data,
-                                                                                                  abnormal_label,
-                                                                                                  hidden_num, elem_num)
-
-                                s_precision.append(final_p)
-                                s_recall.append(final_r)
-                                s_f1.append(final_f)
-                                s_roc_auc.append(final_average_roc_auc)
-                                s_pr_auc.append(final_average_precision)
-                                s_cks.append(cks)
-                        print('########################################')
-                        avg_precision = CalculateAverageMetric(s_precision)
-                        print('avg_precision=' + str(avg_precision))
-                        avg_recall = CalculateAverageMetric(s_recall)
-                        print('avg_recall=' + str(avg_recall))
-                        avg_f1 = CalculateAverageMetric(s_f1)
-                        print('avg_f1=' + str(avg_f1))
-                        avg_roc_auc = CalculateAverageMetric(s_roc_auc)
-                        print('avg_roc_auc=' + str(avg_roc_auc))
-                        avg_pr_auc = CalculateAverageMetric(s_pr_auc)
-                        print('avg_pr_auc=' + str(avg_pr_auc))
-                        avg_cks = CalculateAverageMetric(s_cks)
-                        print('avg_cks=' + str(avg_cks))
-                        print('########################################')
-
-    else:
-        # file name parameter
-        dataset = int(sys.argv[1])
-
-        if dataset == 1:
-            file_name = './GD/data/Genesis_AnomalyLabels.csv'
-            print(file_name)
-            k_partition = 40
-            abnormal_data, abnormal_label = ReadGDDataset(file_name)
-            elem_num = 18
-            if multivariate:
-                abnormal_data = np.expand_dims(abnormal_data, axis=0)
-            if partition:
-                splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data, abnormal_label, _part_number=k_partition)
-                final_error = []
-                for i in range(k_partition):
-                    error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                    final_error.append(error_partition)
-                # print('-----------------------------------------')
-                final_error = np.concatenate(final_error).ravel()
-                final_zscore = Z_Score(final_error)
-                y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                precision, recall, f1 = CalculatePrecisionRecallF1Metrics(abnormal_label, y_pred)
-                PrintPrecisionRecallF1Metrics(precision, recall, f1)
-                _, _, roc_auc = CalculateROCAUCMetrics(abnormal_label, final_error)
-                print('roc_auc=' + str(roc_auc))
-                _, _, pr_auc = CalculatePrecisionRecallCurve(abnormal_label, final_error)
-                print('pr_auc=' + str(pr_auc))
-                cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                print('cohen_kappa=' + str(cks))
-            else:
-                error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label, hidden_num, elem_num)
         
-        if dataset == 2:
-            file_name = './HSS/data/HRSS_anomalous_standard.csv'
-            print(file_name)
-            k_partition = 80
-            abnormal_data, abnormal_label = ReadHSSDataset(file_name)
-            elem_num = 18
-            if multivariate:
-                abnormal_data = np.expand_dims(abnormal_data, axis=0)
-            if partition:
-                splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data, abnormal_label, _part_number=k_partition)
-                final_error = []
-                for i in range(k_partition):
-                    error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                    final_error.append(error_partition)
-                # print('-----------------------------------------')
-                final_error = np.concatenate(final_error).ravel()
-                final_zscore = Z_Score(final_error)
-                y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                precision, recall, f1 = CalculatePrecisionRecallF1Metrics(abnormal_label, y_pred)
-                PrintPrecisionRecallF1Metrics(precision, recall, f1)
-                _, _, roc_auc = CalculateROCAUCMetrics(abnormal_label, final_error)
-                print('roc_auc=' + str(roc_auc))
-                _, _, pr_auc = CalculatePrecisionRecallCurve(abnormal_label, final_error)
-                print('pr_auc=' + str(pr_auc))
-                cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                print('cohen_kappa=' + str(cks))
-            else:
-                error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label, hidden_num, elem_num)
+        dataset = 4
 
-        if dataset == 3:
-            for root, dirs, _ in os.walk('./YAHOO/data'):
+        if dataset == 4:
+            for root, dirs, _ in os.walk('./NAB/data'):
                 for dir in dirs:
                     k_partition = 10
                     s_precision = []
@@ -769,7 +331,7 @@ if __name__ == '__main__':
                         for file in files:
                             file_name = os.path.join(root, dir, file)
                             print(file_name)
-                            abnormal_data, abnormal_label = ReadS5Dataset(file_name)
+                            abnormal_data, abnormal_label = ReadNABDataset(file_name)
                             elem_num = 1
                             if multivariate:
                                 abnormal_data = np.expand_dims(abnormal_data, axis=0)
@@ -778,8 +340,7 @@ if __name__ == '__main__':
                                                                                          _part_number=k_partition)
                                 final_error = []
                                 for i in range(k_partition):
-                                    error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(
-                                        splitted_data[i], splitted_label[i], hidden_num, elem_num)
+                                    error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(splitted_data[i], splitted_label[i], hidden_num, elem_num)
                                     final_error.append(error_partition)
                                 # print('-----------------------------------------')
                                 final_error = np.concatenate(final_error).ravel()
@@ -794,8 +355,7 @@ if __name__ == '__main__':
                                 cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
                                 print('cohen_kappa=' + str(cks))
                             else:
-                                error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label,
-                                                                                              hidden_num, elem_num)
+                                error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label, hidden_num, elem_num)
 
                             s_precision.append(precision)
                             s_recall.append(recall)
@@ -817,6 +377,80 @@ if __name__ == '__main__':
                     avg_cks = CalculateAverageMetric(s_cks)
                     print('avg_cks=' + str(avg_cks))
                     print('########################################')
+
+        
+
+        if dataset == 7:
+            for root, dirs, files in os.walk('./ECG/'):
+                for dir in dirs:
+                    k_partition = 10
+                    s_precision = []
+                    s_recall = []
+                    s_f1 = []
+                    s_roc_auc = []
+                    s_pr_auc = []
+                    s_cks = []
+                    for _, _, files in os.walk(root + '/' + dir):
+                        for file in files:
+                            file_name = os.path.join(root, dir, file)
+                            print(file_name)
+                            abnormal_data, abnormal_label = ReadECGDataset(file_name)
+                            elem_num = 3
+                            if multivariate:
+                                abnormal_data = np.expand_dims(abnormal_data, axis=0)
+                            if partition:
+                                splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data,
+                                                                                         abnormal_label,
+                                                                                         _part_number=k_partition)
+                                final_error = []
+                                for i in range(k_partition):
+                                    error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, pr_cks = RunModel(
+                                        splitted_data[i], splitted_label[i], hidden_num, elem_num)
+                                    final_error.append(error_partition)
+                                # print('-----------------------------------------')
+                                final_error = np.concatenate(final_error).ravel()
+                                final_zscore = Z_Score(final_error)
+                                y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
+                                final_p, final_r, final_f = CalculatePrecisionRecallF1Metrics(abnormal_label,
+                                                                                              y_pred)
+                                PrintPrecisionRecallF1Metrics(final_p, final_r, final_f)
+                                final_fpr, final_tpr, final_average_roc_auc = CalculateROCAUCMetrics(abnormal_label,
+                                                                                                     final_error)
+                                print('roc_auc=' + str(final_average_roc_auc))
+                                final_precision_curve, final_recall_curve, final_average_precision = CalculatePrecisionRecallCurve(
+                                    abnormal_label, final_error)
+                                print('pr_auc=' + str(final_average_precision))
+                                cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
+                                print('cohen_kappa=' + str(cks))
+                            else:
+                                error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data,
+                                                                                              abnormal_label,
+                                                                                              hidden_num, elem_num)
+
+                            s_precision.append(final_p)
+                            s_recall.append(final_r)
+                            s_f1.append(final_f)
+                            s_roc_auc.append(final_average_roc_auc)
+                            s_pr_auc.append(final_average_precision)
+                            s_cks.append(cks)
+                    print('########################################')
+                    avg_precision = CalculateAverageMetric(s_precision)
+                    print('avg_precision=' + str(avg_precision))
+                    avg_recall = CalculateAverageMetric(s_recall)
+                    print('avg_recall=' + str(avg_recall))
+                    avg_f1 = CalculateAverageMetric(s_f1)
+                    print('avg_f1=' + str(avg_f1))
+                    avg_roc_auc = CalculateAverageMetric(s_roc_auc)
+                    print('avg_roc_auc=' + str(avg_roc_auc))
+                    avg_pr_auc = CalculateAverageMetric(s_pr_auc)
+                    print('avg_pr_auc=' + str(avg_pr_auc))
+                    avg_cks = CalculateAverageMetric(s_cks)
+                    print('avg_cks=' + str(avg_cks))
+                    print('########################################')
+
+    else:
+        # file name parameter
+        dataset = int(sys.argv[1])    
 
         if dataset == 4:
             for root, dirs, _ in os.walk('./NAB/data'):
@@ -881,136 +515,6 @@ if __name__ == '__main__':
                     print('avg_cks=' + str(avg_cks))
                     print('########################################')
 
-        if dataset == 5:
-            for root, dirs, files in os.walk('./2D/test'):
-                for dir in dirs:
-                    k_partition = 3
-                    s_precision = []
-                    s_recall = []
-                    s_f1 = []
-                    s_roc_auc = []
-                    s_pr_auc = []
-                    s_cks = []
-                    for _, _, files in os.walk(root + '/' + dir):
-                        for file in files:
-                            file_name = os.path.join(root, dir, file)
-                            print(file_name)
-                            abnormal_data, abnormal_label = Read2DDataset(file_name)
-                            elem_num = 2
-                            if multivariate:
-                                abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                            if partition:
-                                splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data,
-                                                                                         abnormal_label,
-                                                                                         _part_number=k_partition)
-                                final_error = []
-                                for i in range(k_partition):
-                                    error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, pr_cks = RunModel(
-                                        splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                                    final_error.append(error_partition)
-                                # print('-----------------------------------------')
-                                final_error = np.concatenate(final_error).ravel()
-                                final_zscore = Z_Score(final_error)
-                                y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                                final_p, final_r, final_f = CalculatePrecisionRecallF1Metrics(abnormal_label,
-                                                                                              y_pred)
-                                PrintPrecisionRecallF1Metrics(final_p, final_r, final_f)
-                                final_fpr, final_tpr, final_average_roc_auc = CalculateROCAUCMetrics(abnormal_label,
-                                                                                                     final_error)
-                                print('roc_auc=' + str(final_average_roc_auc))
-                                final_precision_curve, final_recall_curve, final_average_precision = CalculatePrecisionRecallCurve(
-                                    abnormal_label, final_error)
-                                print('pr_auc=' + str(final_average_precision))
-                                cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                                print('cohen_kappa=' + str(cks))
-                            else:
-                                error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data,
-                                                                                              abnormal_label,
-                                                                                              hidden_num, elem_num)
-
-                            s_precision.append(final_p)
-                            s_recall.append(final_r)
-                            s_f1.append(final_f)
-                            s_roc_auc.append(final_average_roc_auc)
-                            s_pr_auc.append(final_average_precision)
-                            s_cks.append(cks)
-                    print('########################################')
-                    avg_precision = CalculateAverageMetric(s_precision)
-                    print('avg_precision=' + str(avg_precision))
-                    avg_recall = CalculateAverageMetric(s_recall)
-                    print('avg_recall=' + str(avg_recall))
-                    avg_f1 = CalculateAverageMetric(s_f1)
-                    print('avg_f1=' + str(avg_f1))
-                    avg_roc_auc = CalculateAverageMetric(s_roc_auc)
-                    print('avg_roc_auc=' + str(avg_roc_auc))
-                    avg_pr_auc = CalculateAverageMetric(s_pr_auc)
-                    print('avg_pr_auc=' + str(avg_pr_auc))
-                    avg_cks = CalculateAverageMetric(s_cks)
-                    print('avg_cks=' + str(avg_cks))
-                    print('########################################')
-
-        if dataset == 6:
-            k_partition = 2
-            s_precision = []
-            s_recall = []
-            s_f1 = []
-            s_roc_auc = []
-            s_pr_auc = []
-            s_cks = []
-            for root, dirs, _ in os.walk('./UAH/'):
-                for dir in dirs:
-                    folder_name = os.path.join(root, dir)
-                    print(folder_name)
-                    abnormal_data, abnormal_label = ReadUAHDataset(folder_name)
-                    elem_num = 4
-                    if multivariate:
-                        abnormal_data = np.expand_dims(abnormal_data, axis=0)
-                    if partition:
-                        splitted_data, splitted_label = PartitionTimeSeriesKPart(abnormal_data, abnormal_label,
-                                                                                 _part_number=k_partition)
-                        final_error = []
-                        for i in range(k_partition):
-                            error_partition, precision_partition, recall_partition, f1_partition, roc_auc_partition, pr_auc_partition, cks = RunModel(
-                                splitted_data[i], splitted_label[i], hidden_num, elem_num)
-                            final_error.append(error_partition)
-                        # print('-----------------------------------------')
-                        final_error = np.concatenate(final_error).ravel()
-                        final_zscore = Z_Score(final_error)
-                        y_pred = CreateLabelBasedOnZscore(final_zscore, 3)
-                        print('########################################')
-                        precision, recall, f1 = CalculatePrecisionRecallF1Metrics(abnormal_label, y_pred)
-                        PrintPrecisionRecallF1Metrics(precision, recall, f1)
-                        _, _, roc_auc = CalculateROCAUCMetrics(abnormal_label, final_error)
-                        print('roc_auc=' + str(roc_auc))
-                        _, _, pr_auc = CalculatePrecisionRecallCurve(abnormal_label, final_error)
-                        print('pr_auc=' + str(pr_auc))
-                        cks = CalculateCohenKappaMetrics(abnormal_label, y_pred)
-                        print('cohen_kappa=' + str(cks))
-                        print('########################################')
-                    else:
-                        error, precision, recall, f1, roc_auc, pr_auc, cks = RunModel(abnormal_data, abnormal_label,
-                                                                                      hidden_num, elem_num)
-
-                    s_precision.append(precision)
-                    s_recall.append(recall)
-                    s_f1.append(f1)
-                    s_roc_auc.append(roc_auc)
-                    s_pr_auc.append(pr_auc)
-                    s_cks.append(cks)
-            print('########################################')
-            avg_precision = CalculateAverageMetric(s_precision)
-            print('avg_precision=' + str(avg_precision))
-            avg_recall = CalculateAverageMetric(s_recall)
-            print('avg_recall=' + str(avg_recall))
-            avg_f1 = CalculateAverageMetric(s_f1)
-            print('avg_f1=' + str(avg_f1))
-            avg_roc_auc = CalculateAverageMetric(s_roc_auc)
-            print('avg_roc_auc=' + str(avg_roc_auc))
-            avg_pr_auc = CalculateAverageMetric(s_pr_auc)
-            print('avg_pr_auc=' + str(avg_pr_auc))
-            avg_cks = CalculateAverageMetric(s_cks)
-            print('avg_cks=' + str(avg_cks))
-            print('########################################')
 
         if dataset == 7:
             for root, dirs, files in os.walk('./ECG/'):
