@@ -25,3 +25,8 @@ bidirectional RNN autoencoders.
 
 
 ## How to Run:
+```bash 
+    python Bidirectional_IF-SF_ae.py
+```
+
+The scripts for the other methods can be ran the same way.
