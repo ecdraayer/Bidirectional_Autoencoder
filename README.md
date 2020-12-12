@@ -17,11 +17,11 @@ bidirectional RNN autoencoders.
 * **NAB**: This folder contains a small sample of the NAB dataset used in the benchmarking of these algorithms. Links to the full dataset can be found in the paper.
 
 ## Dependencies
-Python 3.5
-TensorFlow 1.4.0
-Scikit-learn 1.19
-Pandas
-Numpy
+* Python 3.5
+* TensorFlow 1.4.0
+* Scikit-learn 1.19
+* Pandas
+* Numpy
 
 
 ## How to Run:
