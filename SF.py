@@ -169,128 +169,229 @@ class RGRUCell(tf.nn.rnn_cell.GRUCell):
         return W, b
 
 
-def Model(_abnormal_data, _abnormal_label, _hidden_num, _elem_num):
+def Model(_abnormal_data, _abnormal_label, _hidden_num, _elem_num, _file_name, _partition):
     tf.reset_default_graph()
     g = tf.Graph()
     with g.as_default():
         # placeholder list
         p_input = tf.placeholder(tf.float32, shape=(batch_num, _abnormal_data.shape[1], _abnormal_data.shape[2]))
 
-        # create RNN cell
-        if cell_type == 0:
-            enc_cell = tf.nn.rnn_cell.BasicRNNCell(_hidden_num)
-            dec_cell = tf.nn.rnn_cell.BasicRNNCell(_hidden_num)
-        if cell_type == 1:
-            enc_cell = RLSTMCell(_hidden_num)
-            dec_cell = RLSTMCell(_hidden_num)
-        if cell_type == 2:
-            enc_cell = RGRUCell(_hidden_num)
-            dec_cell = RGRUCell(_hidden_num)
+        # Regularizer signature
+        l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.005, scope=None)
 
+        # Projection layer
         projection_layer = tf.layers.Dense(units=_elem_num, use_bias=True)
 
         # with tf.device('/device:GPU:0'):
+        d_enc = {}
         with tf.variable_scope('encoder'):
-            (enc_output, enc_state) = tf.nn.dynamic_rnn(enc_cell, p_input, dtype=tf.float32)
+            for j in range(ensemble_space):
+                # create RNN cell
+                if cell_type == 0:
+                    enc_cell = tf.nn.rnn_cell.BasicRNNCell(_hidden_num)
+                if cell_type == 1:
+                    pure_enc_cell = LSTMCell(_hidden_num)
+                    residual_enc_cell = RLSTMCell(_hidden_num)
+                    # enc_cell = RSLSTMCell(_hidden_num, file_name=_file_name, type='enc', partition=_partition,
+                    #                       component=j, reuse=tf.AUTO_REUSE)
+                    enc_cell = RKLSTMCell(_hidden_num, file_name=_file_name, type='enc', partition=_partition,
+                                          component=j, reuse=tf.AUTO_REUSE)
+                if cell_type == 2:
+                    pure_enc_cell = GRUCell(_hidden_num)
+                    enc_cell = RSGRUCell(_hidden_num)
+                if j == 0:
+                    d_enc['enc_output_{0}'.format(j)], d_enc['enc_state_{0}'.format(j)] = tf.nn.dynamic_rnn(
+                        pure_enc_cell, p_input, dtype=tf.float32)
+
+                elif j == 1:
+                    d_enc['enc_output_{0}'.format(j)], d_enc['enc_state_{0}'.format(j)] = tf.nn.dynamic_rnn(
+                        residual_enc_cell, p_input, dtype=tf.float32)
+
+                else:
+                    d_enc['enc_output_{0}'.format(j)], d_enc['enc_state_{0}'.format(j)] = tf.nn.dynamic_rnn(enc_cell,
+                                                                                                            p_input,
+                                                                                                            dtype=tf.float32)
+
+          
+            b_c = tf.Variable(tf.zeros([_hidden_num]))
+            w_h = tf.Variable(tf.zeros([_hidden_num, _hidden_num]))
+            b_h = tf.Variable(tf.zeros([_hidden_num]))
+            shared_state_c = tf.concat([tf.matmul(d_enc['enc_state_{0}'.format(j)].c, w_c) + b_c for j in range(ensemble_space)], axis=1)
+            shared_state_h = tf.concat([tf.matmul(d_enc['enc_state_{0}'.format(j)].h, w_h) + b_h for j in range(ensemble_space)], axis=1)
+
+            if compress:
+                compress_state = tf.layers.Dense(units=_hidden_num, activation=tf.tanh, use_bias=True)
+                shared_state_c = compress_state(shared_state_c)
+                shared_state_h = compress_state(shared_state_h)
+
+            shared_state = LSTMStateTuple(shared_state_c, shared_state_h)
 
         # with tf.device('/device:GPU:1'):
+        d_dec = {}
         with tf.variable_scope('decoder') as vs:
-            # dec_weight_ = tf.Variable(tf.truncated_normal([hidden_num, elem_num], dtype=tf.float32), name='dec_weight')
-            # dec_bias_ = tf.Variable(tf.constant(0.1, shape=[elem_num], dtype=tf.float32), name='dec_bias')
             if decode_without_input:
                 dec_input = tf.zeros([p_input.shape[0], p_input.shape[1], p_input.shape[2]], dtype=tf.float32)
-                (dec_outputs, dec_state_) = tf.nn.dynamic_rnn(dec_cell, dec_input, initial_state=enc_state, dtype=tf.float32)
-                if reverse:
-                    dec_outputs = dec_outputs[::-1]
+                for k in range(ensemble_space):
+                    # create RNN cell
+                    if cell_type == 0:
+                        dec_cell = tf.nn.rnn_cell.BasicRNNCell(_hidden_num)
+                    if cell_type == 1:
+                        if compress:
+                            pure_dec_cell = LSTMCell(_hidden_num)
+                            residual_dec_cell = RLSTMCell(_hidden_num)
+                            dec_cell = RSLSTMCell(_hidden_num, file_name=_file_name, type='dec', partition=_partition,
+                                                  component=k, reuse=tf.AUTO_REUSE)
+                        else:
+                            pure_dec_cell = LSTMCell(_hidden_num * ensemble_space)
+                            residual_dec_cell = RLSTMCell(_hidden_num * ensemble_space)
+                            dec_cell = RSLSTMCell(_hidden_num * ensemble_space, file_name=_file_name, type='dec',
+                                                  partition=_partition, component=k, reuse=tf.AUTO_REUSE)
+                    if cell_type == 2:
+                        if compress:
+                            pure_dec_cell = GRUCell(_hidden_num)
+                            dec_cell = RSGRUCell(_hidden_num)
+                        else:
+                            pure_dec_cell = GRUCell(_hidden_num * ensemble_space)
+                            dec_cell = RSGRUCell(_hidden_num * ensemble_space)
+
+                    if k == 0:
+                        d_dec['dec_output_{0}'.format(k)], d_dec['dec_state_{0}'.format(k)] = tf.nn.dynamic_rnn(
+                            pure_dec_cell, dec_input, initial_state=shared_state, dtype=tf.float32)
+                    elif k == 1:
+                        d_dec['dec_output_{0}'.format(k)], d_dec['dec_state_{0}'.format(k)] = tf.nn.dynamic_rnn(
+                            residual_dec_cell, dec_input, initial_state=shared_state, dtype=tf.float32)
+                    else:
+                        d_dec['dec_output_{0}'.format(k)], d_dec['dec_state_{0}'.format(k)] = tf.nn.dynamic_rnn(
+                            dec_cell, dec_input, initial_state=shared_state, dtype=tf.float32)
+
+                    if reverse:
+                        d_dec['dec_output_{0}'.format(k)] = d_dec['dec_output_{0}'.format(k)][::-1]
+
             else:
                 dec_input = tf.zeros([p_input.shape[0], p_input.shape[2]], dtype=tf.float32)
-                inference_helper = tf.contrib.seq2seq.InferenceHelper(
-                    sample_fn=lambda outputs: outputs,
-                    sample_shape=[_elem_num],
-                    sample_dtype=tf.float32,
-                    start_inputs=dec_input,
-                    end_fn=lambda sample_ids: False)
-                inference_decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell,
-                                                                    inference_helper,
-                                                                    enc_state,
-                                                                    output_layer=projection_layer)
-                dec_outputs, _, _ = tf.contrib.seq2seq.dynamic_decode(
-                    inference_decoder, impute_finished=True,
-                    maximum_iterations=p_input.shape[1])
+                for k in range(ensemble_space):
+                    # create RNN cell
+                    if cell_type == 0:
+                        dec_cell = tf.nn.rnn_cell.BasicRNNCell(_hidden_num)
+                    if cell_type == 1:
+                        if compress:
+                            pure_dec_cell = LSTMCell(_hidden_num)
+                            residual_dec_cell = RLSTMCell(_hidden_num)
+                            # dec_cell = RSLSTMCell(_hidden_num, file_name=_file_name, type='dec', partition=_partition,
+                            #                       component=k, reuse=tf.AUTO_REUSE)
+                            dec_cell = RKLSTMCell(_hidden_num, file_name=_file_name, type='dec', partition=_partition,
+                                                  component=k, reuse=tf.AUTO_REUSE)
+                        else:
+                            pure_dec_cell = LSTMCell(_hidden_num * ensemble_space)
+                            residual_dec_cell = RLSTMCell(_hidden_num * ensemble_space)
+                            # dec_cell = RSLSTMCell(_hidden_num * ensemble_space, file_name=_file_name, type='dec',
+                            #                       partition=_partition, component=k, reuse=tf.AUTO_REUSE)
+                            dec_cell = RKLSTMCell(_hidden_num * ensemble_space, file_name=_file_name, type='dec',
+                        partition = _partition, component=k, reuse=tf.AUTO_REUSE)
+                    if cell_type == 2:
+                        if compress:
+                            pure_dec_cell = GRUCell(_hidden_num)
+                            dec_cell = RSGRUCell(_hidden_num)
+                        else:
+                            pure_dec_cell = GRUCell(_hidden_num * ensemble_space)
+                            dec_cell = RSGRUCell(_hidden_num * ensemble_space)
 
-                if reverse:
-                    dec_outputs = dec_outputs[::-1]
+                    inference_helper = tf.contrib.seq2seq.InferenceHelper(
+                        sample_fn=lambda outputs: outputs,
+                        sample_shape=[_elem_num],
+                        sample_dtype=tf.float32,
+                        start_inputs=dec_input,
+                        end_fn=lambda sample_ids: False)
+                    if k == 0:
+                        inference_decoder = tf.contrib.seq2seq.BasicDecoder(pure_dec_cell, inference_helper,
+                                                                            shared_state, output_layer=projection_layer)
+                    elif k == 1:
+                        inference_decoder = tf.contrib.seq2seq.BasicDecoder(residual_dec_cell, inference_helper,
+                                                                            shared_state, output_layer=projection_layer)
+                    else:
+                        inference_decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell, inference_helper, shared_state,
+                                                                            output_layer=projection_layer)
 
-        loss = tf.reduce_mean(tf.square(p_input - dec_outputs))
+                    d_dec['dec_output_{0}'.format(k)], _, _ = tf.contrib.seq2seq.dynamic_decode(inference_decoder,
+                                                                                                impute_finished=True,
+                                                                                                maximum_iterations=
+                                                                                                p_input.shape[1])
+
+                    if reverse:
+                        d_dec['dec_output_{0}'.format(k)] = d_dec['dec_output_{0}'.format(k)][::-1]
+
+        sum_of_difference = 0
+        for i in range(ensemble_space):
+            sum_of_difference += d_dec['dec_output_{0}'.format(i)][0] - p_input
+
+        loss = tf.reduce_mean(tf.square(sum_of_difference))
+        regularization_penalty = tf.contrib.layers.apply_regularization(l1_regularizer, [shared_state])
+        loss = loss + regularization_penalty
         optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
         # Add ops to save and restore all the variables.
         saver = tf.train.Saver()
-    return g, p_input, dec_outputs, loss, optimizer, saver
+    return g, p_input, d_dec, loss, optimizer, saver
 
 
-def RunModel(_abnormal_data, _abnormal_label, _hidden_num, _elem_num):
-    graph, p_input, dec_outputs, loss, optimizer, saver = Model(_abnormal_data, _abnormal_label, _hidden_num, _elem_num)
+def RunModel(_abnormal_data, _abnormal_label, _hidden_num, _elem_num, _file_name, _partition):
+    graph, p_input, d_dec, loss, optimizer, saver = Model(_abnormal_data, _abnormal_label, _hidden_num, _elem_num,
+                                                          _file_name, _partition)
     config = tf.ConfigProto()
 
     # config.gpu_options.allow_growth = True
-    # config.allow_soft_placement = True
 
     # Add ops to save and restore all the variables.
     with tf.Session(graph=graph, config=config) as sess:
         sess.run(tf.global_variables_initializer())
 
         for i in range(iteration):
-            """Random sequences.
-              Every sequence has size batch_num * step_num * elem_num 
-              Each step number increases 1 by 1.
-              An initial number of each sequence is in the range from 0 to 19.
-              (ex. [8. 9. 10. 11. 12. 13. 14. 15])
-            """
-
+    
             (loss_val, _) = sess.run([loss, optimizer], {p_input: _abnormal_data})
             # print('iter %d:' % (i + 1), loss_val)
-
         if save_model:
-            save_path = saver.save(sess, './saved_model/' + pathlib.Path(file_name).parts[0] + '/skip_rnn_seq2seq_' + str(cell_type) + '_' + os.path.basename(file_name) + '.ckpt')
+            save_path = saver.save(sess, './saved_model/' + pathlib.Path(file_name).parts[
+                0] + '/shared_code_masked_skip_rnn_seq2seq_' + str(cell_type) + '_' + os.path.basename(
+                file_name) + '.ckpt')
             print("Model saved in path: %s" % save_path)
 
-        (input_, output_) = sess.run([p_input, dec_outputs], {p_input: _abnormal_data})
-        error = SquareErrorDataPoints(input_, output_[0])
+        result = {}
+        error = []
+        for k in range(ensemble_space):
+            (result['input_{0}'.format(k)], result['output_{0}'.format(k)]) = sess.run(
+                [p_input, d_dec['dec_output_{0}'.format(k)]], {p_input: _abnormal_data})
+            error.append(SquareErrorDataPoints(result['input_{0}'.format(k)], result['output_{0}'.format(k)][0]))
 
-        # np.savetxt('./saved_result/' + pathlib.Path(file_name).parts[0] + '/rnn_seq2seq_' + os.path.basename(file_name) + '_error.txt', error, delimiter=',')  # X is an array
-        zscore = Z_Score(error)
-        # np.savetxt('./saved_result/' + pathlib.Path(file_name).parts[0] + '/rnn_seq2seq_' + os.path.basename(file_name) + '_zscore.txt', zscore, delimiter=',')  # X is an array
+        sess.close()
 
-        y_pred = CreateLabelBasedOnZscore(zscore, 3)
+    ensemble_errors = np.asarray(error)
+    anomaly_score = CalculateFinalAnomalyScore(ensemble_errors)
+    zscore = Z_Score(anomaly_score)
+    y_pred = CreateLabelBasedOnZscore(zscore, 3)
+    if not partition:
+        score_pred_label = np.c_[ensemble_errors, y_pred, _abnormal_label]
+        np.savetxt('./saved_result/' + pathlib.Path(file_name).parts[
+            0] + '/shared_code_masked_skip_rnn_seq2seq_' + os.path.basename(file_name) + '_score.txt', score_pred_label,
+                   delimiter=',')  # X is an array
 
-        if not partition:
-            score_pred_label = np.c_[error, y_pred, _abnormal_label]
-            np.savetxt('./saved_result/' + pathlib.Path(file_name).parts[0] + '/skip_rnn_seq2seq_' + os.path.basename(file_name) + '_score.txt', score_pred_label, delimiter=',')  # X is an array
+    precision, recall, f1 = CalculatePrecisionRecallF1Metrics(_abnormal_label, y_pred)
+    if not partition:
+        PrintPrecisionRecallF1Metrics(precision, recall, f1)
 
-        p, r, f = CalculatePrecisionRecallF1Metrics(_abnormal_label, y_pred)
-        if not partition:
-            PrintPrecisionRecallF1Metrics(p, r, f)
+    fpr, tpr, roc_auc = CalculateROCAUCMetrics(_abnormal_label, anomaly_score)
+    # PlotROCAUC(fpr, tpr, roc_auc)
+    if not partition:
+        print('roc_auc=' + str(roc_auc))
 
-        # k_number = [20, 40, 60, 80, 100]
-        # for k in k_number:
-        #     precision_at_k = CalculatePrecisionAtK(_abnormal_label, error, k, _type=1)
-        #     print('precision at ' + str(k) + '=' + str(precision_at_k))
+    precision_curve, recall_curve, average_precision = CalculatePrecisionRecallCurve(_abnormal_label, anomaly_score)
+    # PlotPrecisionRecallCurve(precision_curve, recall_curve, average_precision)
+    if not partition:
+        print('pr_auc=' + str(average_precision))
 
-        fpr, tpr, average_roc_auc = CalculateROCAUCMetrics(_abnormal_label, error)
-        # PlotROCAUC(fpr, tpr, roc_auc)
-        if not partition:
-            print('roc_auc=' + str(average_roc_auc))
+    cks = CalculateCohenKappaMetrics(_abnormal_label, y_pred)
+    if not partition:
+        print('cks=' + str(cks))
 
-        precision_curve, recall_curve, average_precision = CalculatePrecisionRecallCurve(_abnormal_label, error)
-        # PlotPrecisionRecallCurve(precision_curve, recall_curve, average_precision)
-        if not partition:
-            print('pr_auc=' + str(average_precision))
-
-        cks = CalculateCohenKappaMetrics(_abnormal_label, y_pred)
-        if not partition:
-            print('cks=' + str(cks))
-
-        return error, p, r, f, average_roc_auc, average_precision, cks
+    return anomaly_score, precision, recall, f1, roc_auc, average_precision, cks
 
 if __name__ == '__main__':
     batch_num = 1
@@ -308,7 +409,7 @@ if __name__ == '__main__':
     save_model = False
 
     # cell type 0 => BasicRNN, 1 => LSTM, 2 => GRU
-    cell_type = 1
+    cell_type = 0
     try:
         sys.argv[1]
     except IndexError:

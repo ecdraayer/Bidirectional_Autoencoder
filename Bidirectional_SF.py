@@ -310,7 +310,6 @@ if __name__ == '__main__':
         sys.argv[1]
     except IndexError:
         # Only use NAB dataset
-        
         dataset = 4
 
         if dataset == 4:

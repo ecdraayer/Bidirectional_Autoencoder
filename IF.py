@@ -308,11 +308,11 @@ if __name__ == '__main__':
     save_model = False
 
     # cell type 0 => BasicRNN, 1 => LSTM, 2 => GRU
-    cell_type = 1
+    cell_type = 0
     try:
         sys.argv[1]
     except IndexError:
-        for n in range(1, 7):
+        for n in range(4, 4):
             # file name parameter
             dataset = n
             if dataset == 1:

@@ -104,71 +104,6 @@ class RLSTMCell(tf.nn.rnn_cell.BasicLSTMCell):
         b = tf.get_variable("bias_h_2", shape=b_shape)
         return W, b
 
-
-class RGRUCell(tf.nn.rnn_cell.GRUCell):
-    """Gated Recurrent Unit cell (cf. http://arxiv.org/abs/1406.1078).
-
-    Args:
-      num_units: int, The number of units in the GRU cell.
-      activation: Nonlinearity to use.  Default: `tanh`.
-      reuse: (optional) Python boolean describing whether to reuse variables
-       in an existing scope.  If not `True`, and the existing scope already has
-       the given variables, an error is raised.
-      kernel_initializer: (optional) The initializer to use for the weight and
-      projection matrices.
-      bias_initializer: (optional) The initializer to use for the bias.
-    """
-
-    def __init__(self, num_units, activation=None, reuse=None, kernel_initializer=None, bias_initializer=None):
-        super(tf.nn.rnn_cell.GRUCell, self).__init__(_reuse=reuse)
-        self._num_units = num_units
-        self._activation = activation or tf.nn.tanh
-        self._kernel_initializer = kernel_initializer
-        self._bias_initializer = bias_initializer
-        self._gate_linear = None
-        self._candidate_linear = None
-
-    @property
-    def state_size(self):
-        return self._num_units
-
-    @property
-    def output_size(self):
-        return self._num_units
-
-    def call(self, inputs, state):
-        """Gated recurrent unit (GRU) with nunits cells."""
-
-        sigmoid = tf.sigmoid
-
-        if self._gate_linear is None:
-            bias_ones = self._bias_initializer
-            if self._bias_initializer is None:
-                bias_ones = init_ops.constant_initializer(1.0, dtype=inputs.dtype)
-            with vs.variable_scope("gates"):  # Reset gate and update gate.
-                self._gate_linear = _Linear([inputs, state], 2 * self._num_units, True, bias_initializer=bias_ones, kernel_initializer=self._kernel_initializer)
-
-        value = sigmoid(self._gate_linear([inputs, state]))
-        r, u = tf.split(value=value, num_or_size_splits=2, axis=1)
-
-        r_state = r * state
-        if self._candidate_linear is None:
-            with vs.variable_scope("candidate"):
-                self._candidate_linear = _Linear([inputs, r_state], self._num_units, True, bias_initializer=self._bias_initializer, kernel_initializer=self._kernel_initializer)
-        c = self._activation(self._candidate_linear([inputs, r_state]))
-        new_h = (u * state + (1 - u) * c)
-        return new_h, new_h
-
-
-    def weight_bias(self, W_shape, b_shape, bias_init=0.1):
-        """Fully connected highway layer adopted from
-           https://github.com/fomorians/highway-fcn/blob/master/main.py
-        """
-        W = tf.get_variable("weight_h_2", shape=W_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
-        b = tf.get_variable("bias_h_2", shape=b_shape)
-        return W, b
-
-
 # This funciton creates the bidirectional version of IF and SF
 
 def Model(_abnormal_data, _abnormal_label, _hidden_num, _elem_num):
@@ -185,11 +120,11 @@ def Model(_abnormal_data, _abnormal_label, _hidden_num, _elem_num):
         if cell_type == 1:
             enc_cell = RLSTMCell(_hidden_num)
             dec_cell = RLSTMCell(_hidden_num)
-        if cell_type == 2:
-            enc_cell = RGRUCell(_hidden_num)
-            dec_cell = RGRUCell(_hidden_num)
+        
 
         projection_layer = tf.layers.Dense(units=_elem_num, use_bias=True)
+
+
 
         # with tf.device('/device:GPU:0'):
         with tf.variable_scope('encoder'):
@@ -309,7 +244,7 @@ if __name__ == '__main__':
     try:
         sys.argv[1]
     except IndexError:
-        # Only use NAB dataset
+        # Only use NAB dataset for demo
         
         dataset = 4
 
