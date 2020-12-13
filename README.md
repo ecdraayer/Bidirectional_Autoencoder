@@ -5,7 +5,9 @@ This repository hosts the code for Bidirectional Recurrent Neural Network Autoen
 This work directly builds up http://people.cs.aau.dk/~byang/papers/IJCAI2019.pdf which was the first paper to propose a 
 method for creating an ensemble of sparesely connected RNN autoencoders to do time series anomaly detection. The work 
 contained in this repository expanded upong their two methods, IF and SF, to create an ensemble of sparsely connected
-bidirectional RNN autoencoders. 
+bidirectional RNN autoencoders.
+
+Please note that much of this code directly comes from http://people.cs.aau.dk/~byang/papers/IJCAI2019.pdf and I mainly modified it for it my project.
 
 ## Repository Structure
 * **feedforward_ae.py**: method Rand-Net which is a feed forward neural network used for time series anomlay detection
