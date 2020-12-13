@@ -7,7 +7,7 @@ method for creating an ensemble of sparesely connected RNN autoencoders to do ti
 contained in this repository expanded upong their two methods, IF and SF, to create an ensemble of sparsely connected
 bidirectional RNN autoencoders.
 
-Please note that much of this code directly comes from http://people.cs.aau.dk/~byang/papers/IJCAI2019.pdf and I mainly modified it for it my project.
+Please note that much of this code directly comes from http://people.cs.aau.dk/~byang/papers/IJCAI2019.pdf and I modified it for it my project.
 
 ## Repository Structure
 * **feedforward_ae.py**: method Rand-Net which is a feed forward neural network used for time series anomlay detection
