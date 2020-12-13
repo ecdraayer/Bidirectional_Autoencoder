@@ -169,6 +169,8 @@ class RGRUCell(tf.nn.rnn_cell.GRUCell):
         return W, b
 
 
+# This funciton creates the bidirectional version of IF and SF
+
 def Model(_abnormal_data, _abnormal_label, _hidden_num, _elem_num):
     tf.reset_default_graph()
     g = tf.Graph()
@@ -241,12 +243,6 @@ def RunModel(_abnormal_data, _abnormal_label, _hidden_num, _elem_num):
         sess.run(tf.global_variables_initializer())
 
         for i in range(iteration):
-            """Random sequences.
-              Every sequence has size batch_num * step_num * elem_num 
-              Each step number increases 1 by 1.
-              An initial number of each sequence is in the range from 0 to 19.
-              (ex. [8. 9. 10. 11. 12. 13. 14. 15])
-            """
 
             (loss_val, _) = sess.run([loss, optimizer], {p_input: _abnormal_data})
             # print('iter %d:' % (i + 1), loss_val)
