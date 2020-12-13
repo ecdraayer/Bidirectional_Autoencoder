@@ -28,7 +28,11 @@ Please note that much of this code directly comes from http://people.cs.aau.dk/~
 
 ## How to Run:
 ```bash 
-    python Bidirectional_IF-SF_ae.py
+    python Bidirectional_IF.py
+```
+
+```bash 
+    python Bidirectional_SF.py
 ```
 
 The scripts for the other methods can be ran the same way.
